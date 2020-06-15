@@ -1,2 +1,2 @@
 # Kitsune
-Simple event ingestion and distribution service.
+Simple message ingestion and distribution service.

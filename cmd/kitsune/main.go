@@ -23,7 +23,7 @@ func main() {
 		"version", Version,
 	)
 
-	ks := kitsune.Server{}
+	ks := kitsune.New()
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", viper.GetInt("port")),

@@ -8,7 +8,8 @@ import (
 func (s *Server) GetRouter() http.Handler {
 	router := httprouter.New()
 
-	router.Handler(http.MethodGet, "/", s.Hello())
+	router.Handler(http.MethodPost, "/publish/:topic", s.publish())
+	router.Handler(http.MethodGet, "/:topic/:messageId", s.getMessage())
 
 	return router
 }
