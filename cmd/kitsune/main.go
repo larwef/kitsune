@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+// Version injected at compile time.
 var Version = "No version provided"
 
 func main() {

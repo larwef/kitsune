@@ -8,6 +8,14 @@ type PublishRequest struct {
 	Payload    string            `json:"payload"`
 }
 
+type Subscription struct {
+	Topic *Topic
+}
+
+type Topic struct {
+	Messages []*Message
+}
+
 type Message struct {
 	ID            string            `json:"id"`
 	PublishedTime time.Time         `json:"publishedTime"`

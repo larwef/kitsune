@@ -11,12 +11,14 @@ import (
 )
 
 type Server struct {
-	messages map[string]map[string]*Message
+	topics   map[string]*Topic
+	messages map[string]*Message
 }
 
 func New() *Server {
 	return &Server{
-		messages: map[string]map[string]*Message{},
+		topics:   make(map[string]*Topic),
+		messages: make(map[string]*Message),
 	}
 }
 
@@ -83,26 +85,21 @@ func (s *Server) getMessage() http.HandlerFunc {
 }
 
 func (s *Server) persistMessage(message Message) error {
-	topic, exists := s.messages[message.Topic]
+	s.messages[message.ID] = &message
+
+	topic, exists := s.topics[message.Topic]
 	if !exists {
-		s.messages[message.Topic] = map[string]*Message{message.ID: &message}
+		s.topics[message.Topic] = &Topic{Messages: []*Message{&message}}
 		return nil
 	}
 
-	topic[message.ID] = &message
-
-	fmt.Println(s.messages)
+	topic.Messages = append(topic.Messages, &message)
 
 	return nil
 }
 
 func (s *Server) retrieveMessage(topic, id string) (*Message, error) {
-	topicMap, exists := s.messages[topic]
-	if !exists {
-		return nil, fmt.Errorf("could not find topic %q", topic)
-	}
-
-	message, exists := topicMap[id]
+	message, exists := s.messages[id]
 	if !exists {
 		return nil, fmt.Errorf("could not find message %q in topic %q", id, topic)
 	}
