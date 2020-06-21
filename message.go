@@ -8,12 +8,9 @@ type PublishRequest struct {
 	Payload    string            `json:"payload"`
 }
 
-type Subscription struct {
-	Topic *Topic
-}
-
-type Topic struct {
-	Messages []*Message
+type PollRequest struct {
+	SubscriptionName    string `json:"subscriptionName"`
+	MaxNumberOfMessages uint   `json:"maxNumberOfMessages"`
 }
 
 type Message struct {
@@ -23,4 +20,13 @@ type Message struct {
 	EventTime     *time.Time        `json:"eventTime,omitempty"`
 	Topic         string            `json:"topic"`
 	Payload       string            `json:"payload"`
+}
+
+type Topic struct {
+	Messages []*Message
+}
+
+type Subscription struct {
+	Topic *Topic
+	Index uint
 }

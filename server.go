@@ -11,16 +11,20 @@ import (
 )
 
 type Server struct {
-	topics   map[string]*Topic
-	messages map[string]*Message
+	topics        map[string]*Topic
+	messages      map[string]*Message
+	subscriptions map[string]*Subscription
 }
 
 func New() *Server {
 	return &Server{
-		topics:   make(map[string]*Topic),
-		messages: make(map[string]*Message),
+		topics:        map[string]*Topic{},
+		messages:      map[string]*Message{},
+		subscriptions: map[string]*Subscription{},
 	}
 }
+
+// TODO: Improve error handling. Define custom errors for persistance stuff.
 
 func (s *Server) publish() http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
@@ -70,7 +74,6 @@ func (s *Server) getMessage() http.HandlerFunc {
 		message, err := s.retrieveMessage(params.ByName("topic"), params.ByName("messageId"))
 		if err != nil {
 			zap.S().Errorw("Error retrieving message", "error", err)
-			// TODO: When doing this properly, make a custom error type and make sure its actually not found and not some other error
 			http.Error(res, "Not Found", http.StatusNotFound)
 			return
 		}
@@ -81,6 +84,41 @@ func (s *Server) getMessage() http.HandlerFunc {
 			http.Error(res, "Error marshalling response", http.StatusInternalServerError)
 			return
 		}
+	}
+}
+
+func (s *Server) poll() http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		defer req.Body.Close()
+
+		topic := httprouter.ParamsFromContext(req.Context()).ByName("topic")
+
+		var pollReq PollRequest
+		if err := json.NewDecoder(req.Body).Decode(&pollReq); err != nil {
+			zap.S().Errorw("Error marshalling request", "error", err)
+			http.Error(res, "Unable to unmarshal request", http.StatusBadRequest)
+			return
+		}
+
+		messages, err := s.getMessagesFromTopic(topic, &pollReq)
+		if err != nil {
+			zap.S().Errorw("Error polling messages", "error", err)
+			http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		res.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(res).Encode(&messages); err != nil {
+			zap.S().Errorw("Error marshalling response", "error", err)
+			http.Error(res, "Error marshalling response", http.StatusInternalServerError)
+			return
+		}
+
+		zap.S().Infow("Messages sucessfully polled",
+			"topic", topic,
+			"subscription", pollReq.SubscriptionName,
+			"messagesReturned", len(messages),
+		)
 	}
 }
 
@@ -105,4 +143,37 @@ func (s *Server) retrieveMessage(topic, id string) (*Message, error) {
 	}
 
 	return message, nil
+}
+
+func (s *Server) getMessagesFromTopic(topicName string, req *PollRequest) ([]*Message, error) {
+	subscription, subscriptionExists := s.subscriptions[req.SubscriptionName]
+	if !subscriptionExists {
+		topic, topicExists := s.topics[req.SubscriptionName]
+		if !topicExists {
+			return nil, fmt.Errorf("topic %s does noe exist", topicName)
+		}
+
+		s.subscriptions[topicName] = &Subscription{
+			Topic: topic,
+			Index: 0,
+		}
+
+		subscription = s.subscriptions[topicName]
+	}
+
+	start := subscription.Index
+	end := min(int(subscription.Index+req.MaxNumberOfMessages), len(subscription.Topic.Messages))
+
+	messages := subscription.Topic.Messages[start:end]
+	subscription.Index = uint(end)
+
+	return messages, nil
+}
+
+func min(a, b int) int {
+	if b < a {
+		return b
+	}
+
+	return a
 }

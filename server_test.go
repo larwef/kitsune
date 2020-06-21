@@ -3,66 +3,127 @@ package kitsune
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/magiconair/properties/assert"
+	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
-func TestServer(t *testing.T) {
-	tests := []struct {
-		payload        interface{}
-		url            string
-		method         string
-		expectedStatus int
-	}{
-		{
-			payload:        nil,
-			url:            "",
-			method:         http.MethodGet,
-			expectedStatus: http.StatusNotFound,
-		},
-		{
-			payload:        nil,
-			url:            "/testTopic/nonExistingId",
-			method:         http.MethodGet,
-			expectedStatus: http.StatusNotFound,
-		},
-		{
-			payload:        PublishRequest{Payload: "SomePayload"},
-			url:            "/notPublish",
-			method:         http.MethodPost,
-			expectedStatus: http.StatusNotFound,
-		},
-		{
-			payload:        PublishRequest{Payload: "SomePayload"},
-			url:            "/publish/testTopic",
-			method:         http.MethodPost,
-			expectedStatus: http.StatusOK,
-		},
-		{
-			payload:        nil,
-			url:            "/publish/testTopic",
-			method:         http.MethodPut,
-			expectedStatus: http.StatusMethodNotAllowed,
+func TestServer_publish_successful(t *testing.T) {
+	server := New()
+
+	marshal, err := json.Marshal(&PublishRequest{
+		Payload: "testPayload",
+	})
+	assert.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodPost, "/publish/testTopic", bytes.NewBuffer(marshal))
+	assert.NoError(t, err)
+	res := httptest.NewRecorder()
+
+	server.GetRouter().ServeHTTP(res, req)
+
+	assert.Equal(t, http.StatusOK, res.Code)
+	assert.Len(t, server.messages, 1)
+	assert.Len(t, server.topics, 1)
+	assert.Len(t, server.subscriptions, 0)
+}
+
+func TestServer_getMessage(t *testing.T) {
+	server := New()
+	server.messages["testId"] = &Message{
+		ID:            "testId",
+		PublishedTime: time.Now(),
+		Topic:         "testTopic",
+		Payload:       "testPayload",
+	}
+
+	res := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodGet, "/testTopic/testId", nil)
+	assert.NoError(t, err)
+
+	server.GetRouter().ServeHTTP(res, req)
+	assert.Equal(t, http.StatusOK, res.Code)
+}
+
+func TestServer_poll(t *testing.T) {
+	server := New()
+	server.topics["testTopic"] = &Topic{
+		Messages: []*Message{
+			{
+				ID:            "testId1",
+				PublishedTime: time.Now(),
+				Topic:         "testTopic",
+				Payload:       "testPayload1",
+			},
+			{
+				ID:            "testId2",
+				PublishedTime: time.Now(),
+				Topic:         "testTopic",
+				Payload:       "testPayload2",
+			},
+			{
+				ID:            "testId3",
+				PublishedTime: time.Now(),
+				Topic:         "testTopic",
+				Payload:       "testPayload3",
+			},
+			{
+				ID:            "testId4",
+				PublishedTime: time.Now(),
+				Topic:         "testTopic",
+				Payload:       "testPayload4",
+			},
+			{
+				ID:            "testId5",
+				PublishedTime: time.Now(),
+				Topic:         "testTopic",
+				Payload:       "testPayload5",
+			},
 		},
 	}
 
-	for _, test := range tests {
-		marshal, err := json.Marshal(&test.payload)
-		if err != nil {
-			t.Fatal(err)
-		}
+	marshal, err := json.Marshal(&PollRequest{
+		SubscriptionName:    "testTopic",
+		MaxNumberOfMessages: 2,
+	})
+	assert.NoError(t, err)
 
-		req, err := http.NewRequest(test.method, test.url, bytes.NewBuffer(marshal))
-		if err != nil {
-			t.Fatal(err)
-		}
+	var result []*Message
 
-		res := httptest.NewRecorder()
-		server := New()
-		server.GetRouter().ServeHTTP(res, req)
+	res := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodPost, "/poll/testTopic", bytes.NewBuffer(marshal))
+	assert.NoError(t, err)
+	server.GetRouter().ServeHTTP(res, req)
+	assert.Equal(t, http.StatusOK, res.Code)
+	assert.Len(t, server.subscriptions, 1)
+	assert.NoError(t, json.NewDecoder(res.Body).Decode(&result))
+	assert.Len(t, result, 2)
 
-		assert.Equal(t, res.Code, test.expectedStatus)
-	}
+	res = httptest.NewRecorder()
+	req, err = http.NewRequest(http.MethodPost, "/poll/testTopic", bytes.NewBuffer(marshal))
+	assert.NoError(t, err)
+	server.GetRouter().ServeHTTP(res, req)
+	assert.Equal(t, http.StatusOK, res.Code)
+	assert.Len(t, server.subscriptions, 1)
+	assert.NoError(t, json.NewDecoder(res.Body).Decode(&result))
+	assert.Len(t, result, 2)
+
+	res = httptest.NewRecorder()
+	req, err = http.NewRequest(http.MethodPost, "/poll/testTopic", bytes.NewBuffer(marshal))
+	server.GetRouter().ServeHTTP(res, req)
+	assert.Equal(t, http.StatusOK, res.Code)
+	assert.Len(t, server.subscriptions, 1)
+	assert.NoError(t, json.NewDecoder(res.Body).Decode(&result))
+	assert.Len(t, result, 1)
+
+	res = httptest.NewRecorder()
+	req, err = http.NewRequest(http.MethodPost, "/poll/testTopic", bytes.NewBuffer(marshal))
+	server.GetRouter().ServeHTTP(res, req)
+	assert.Equal(t, http.StatusOK, res.Code)
+	assert.Len(t, server.subscriptions, 1)
+	assert.NoError(t, json.NewDecoder(res.Body).Decode(&result))
+	assert.Len(t, result, 0)
+
 }
