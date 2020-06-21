@@ -1,4 +1,4 @@
-package kitsune
+package server
 
 import (
 	"github.com/julienschmidt/httprouter"

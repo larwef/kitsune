@@ -21,12 +21,3 @@ type Message struct {
 	Topic         string            `json:"topic"`
 	Payload       string            `json:"payload"`
 }
-
-type Topic struct {
-	Messages []*Message
-}
-
-type Subscription struct {
-	Topic *Topic
-	Index uint
-}

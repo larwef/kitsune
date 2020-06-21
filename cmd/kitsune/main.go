@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/larwef/kitsune"
+	"github.com/larwef/kitsune/repository/memory"
+	"github.com/larwef/kitsune/server"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -24,7 +25,7 @@ func main() {
 		"version", Version,
 	)
 
-	ks := kitsune.New()
+	ks := server.NewServer(memory.NewRepository())
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", viper.GetInt("port")),
