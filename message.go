@@ -1,6 +1,15 @@
 package kitsune
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var (
+	ErrDuplicateMessage = errors.New("duplicate message id")
+	ErrTopicNotFound    = errors.New("topic not found")
+	ErrMessageNotFound  = errors.New("message not found")
+)
 
 type PublishRequest struct {
 	Properties map[string]string `json:"properties"`

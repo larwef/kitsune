@@ -19,6 +19,7 @@ func TestRepository_PersistMessage(t *testing.T) {
 		Topic:         "testTopic1",
 		Payload:       "testPayload1",
 	})
+
 	assert.NoError(t, err)
 	assert.Len(t, repo.messages, 1)
 	assert.Len(t, repo.topics, 1)
@@ -48,6 +49,29 @@ func TestRepository_PersistMessage(t *testing.T) {
 	assert.Len(t, repo.topics["testTopic2"].messages, 1)
 }
 
+func TestRepository_PersistMessage_Duplicate(t *testing.T) {
+	repo := Repository{
+		messages: map[string]*kitsune.Message{},
+		topics:   map[string]*topic{},
+	}
+
+	err := repo.PersistMessage(&kitsune.Message{
+		ID:            "testId1",
+		PublishedTime: time.Now(),
+		Topic:         "testTopic1",
+		Payload:       "testPayload1",
+	})
+	assert.NoError(t, err)
+
+	err = repo.PersistMessage(&kitsune.Message{
+		ID:            "testId1",
+		PublishedTime: time.Now(),
+		Topic:         "testTopic1",
+		Payload:       "testPayload1",
+	})
+	assert.Equal(t, kitsune.ErrDuplicateMessage, err)
+}
+
 func TestRepository_RetrieveMessage(t *testing.T) {
 	repo := Repository{
 		messages: map[string]*kitsune.Message{
@@ -62,6 +86,15 @@ func TestRepository_RetrieveMessage(t *testing.T) {
 	message, err := repo.RetrieveMessage("testTopic", "testId")
 	assert.NoError(t, err)
 	assert.NotNil(t, message)
+}
+
+func TestRepository_RetrieveMessage_MessageDoesntExist(t *testing.T) {
+	repo := Repository{
+		messages: map[string]*kitsune.Message{},
+	}
+
+	_, err := repo.RetrieveMessage("testTopic", "testId")
+	assert.Equal(t, kitsune.ErrMessageNotFound, err)
 }
 
 func TestRepository_GetMessagesFromTopic(t *testing.T) {
@@ -107,4 +140,19 @@ func TestRepository_GetMessagesFromTopic(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, repo.subscriptions, 1)
 	assert.Len(t, messages, 0)
+}
+
+func TestRepository_GetMessagesFromTopic_TopicDoesntExist(t *testing.T) {
+	repo := &Repository{
+		topics:        map[string]*topic{},
+		subscriptions: map[string]*subscription{},
+	}
+
+	pollReq := kitsune.PollRequest{
+		SubscriptionName:    "testSubscription",
+		MaxNumberOfMessages: 2,
+	}
+
+	_, err := repo.GetMessagesFromTopic("testTopic1", pollReq)
+	assert.Equal(t, kitsune.ErrTopicNotFound, err)
 }

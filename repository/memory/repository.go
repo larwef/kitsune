@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"fmt"
 	"github.com/larwef/kitsune"
 )
 
@@ -29,6 +28,10 @@ func NewRepository() *Repository {
 }
 
 func (r *Repository) PersistMessage(message *kitsune.Message) error {
+	if _, exists := r.messages[message.ID]; exists {
+		return kitsune.ErrDuplicateMessage
+	}
+
 	r.messages[message.ID] = message
 
 	t, exists := r.topics[message.Topic]
@@ -45,7 +48,7 @@ func (r *Repository) PersistMessage(message *kitsune.Message) error {
 func (r *Repository) RetrieveMessage(topic, id string) (*kitsune.Message, error) {
 	message, exists := r.messages[id]
 	if !exists {
-		return nil, fmt.Errorf("could not find message %q in topic %q", id, topic)
+		return nil, kitsune.ErrMessageNotFound
 	}
 
 	return message, nil
@@ -56,7 +59,7 @@ func (r *Repository) GetMessagesFromTopic(topicName string, req kitsune.PollRequ
 	if !subscriptionExists {
 		topic, topicExists := r.topics[topicName]
 		if !topicExists {
-			return nil, fmt.Errorf("topic %s does noe exist", topicName)
+			return nil, kitsune.ErrTopicNotFound
 		}
 
 		r.subscriptions[req.SubscriptionName] = &subscription{

@@ -56,6 +56,18 @@ func TestServer(t *testing.T) {
 			expectedStatus:  http.StatusOK,
 			expectedPayload: "{\"id\":\"someId\",\"publishedTime\":\"2020-06-21T14:52:11.123456Z\",\"topic\":\"testTopic\",\"payload\":\"testPayload\"}\n",
 		},
+		{
+			payload: kitsune.PublishRequest{
+				Payload: "testPayload",
+			},
+			url:    "/publish/testTopic",
+			method: http.MethodPost,
+			persistMessageHandler: func(message *kitsune.Message) error {
+				return kitsune.ErrDuplicateMessage
+			},
+			expectedStatus:  http.StatusConflict,
+			expectedPayload: "Duplicate message id\n",
+		},
 		// GetMessage
 		{
 			payload: nil,
@@ -79,6 +91,16 @@ func TestServer(t *testing.T) {
 			expectedStatus:  http.StatusMethodNotAllowed,
 			expectedPayload: "Method Not Allowed\n",
 		},
+		{
+			payload: nil,
+			url:     "/testTopic/someId",
+			method:  http.MethodGet,
+			retrieveMessageHandler: func(topic, id string) (*kitsune.Message, error) {
+				return nil, kitsune.ErrMessageNotFound
+			},
+			expectedStatus:  http.StatusNotFound,
+			expectedPayload: "Message not found\n",
+		},
 		// Poll
 		{
 			payload: &kitsune.PollRequest{
@@ -92,6 +114,19 @@ func TestServer(t *testing.T) {
 			},
 			expectedStatus:  http.StatusOK,
 			expectedPayload: "[]\n",
+		},
+		{
+			payload: &kitsune.PollRequest{
+				SubscriptionName:    "testTopic",
+				MaxNumberOfMessages: 10,
+			},
+			url:    "/poll/testTopic",
+			method: http.MethodPost,
+			getMessageFromTopicHandler: func(topic string, req kitsune.PollRequest) ([]*kitsune.Message, error) {
+				return []*kitsune.Message{}, kitsune.ErrTopicNotFound
+			},
+			expectedStatus:  http.StatusNotFound,
+			expectedPayload: "Topic not found\n",
 		},
 	}
 

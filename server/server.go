@@ -23,8 +23,6 @@ func NewServer(repo repository.Repository) *Server {
 	return &Server{repo: repo}
 }
 
-// TODO: Improve error handling. Define custom errors for persistance stuff.
-
 func (s *Server) publish() http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		defer req.Body.Close()
@@ -48,7 +46,13 @@ func (s *Server) publish() http.HandlerFunc {
 
 		if err := s.repo.PersistMessage(&message); err != nil {
 			zap.S().Errorw("Error persisting message", "error", err)
-			http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+			switch err {
+			case kitsune.ErrDuplicateMessage:
+				http.Error(res, "Duplicate message id", http.StatusConflict)
+			default:
+				http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+			}
+
 			return
 		}
 
@@ -74,7 +78,12 @@ func (s *Server) getMessage() http.HandlerFunc {
 		message, err := s.repo.RetrieveMessage(params.ByName("topic"), params.ByName("messageId"))
 		if err != nil {
 			zap.S().Errorw("Error retrieving message", "error", err)
-			http.Error(res, "Not Found", http.StatusNotFound)
+			switch err {
+			case kitsune.ErrMessageNotFound:
+				http.Error(res, "Message not found", http.StatusNotFound)
+			default:
+				http.Error(res, "Not Found", http.StatusNotFound)
+			}
 			return
 		}
 
@@ -103,7 +112,13 @@ func (s *Server) poll() http.HandlerFunc {
 		messages, err := s.repo.GetMessagesFromTopic(topic, pollReq)
 		if err != nil {
 			zap.S().Errorw("Error polling messages", "error", err)
-			http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+			switch err {
+			case kitsune.ErrTopicNotFound:
+				http.Error(res, "Topic not found", http.StatusNotFound)
+			default:
+				http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+			}
+
 			return
 		}
 
