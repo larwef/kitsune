@@ -15,10 +15,12 @@ import (
 var now = time.Now
 var id = func() string { return uuid.New().String() }
 
+// Server holds all the http handlers.
 type Server struct {
 	repo repository.Repository
 }
 
+// NewServer returns a new Server object.
 func NewServer(repo repository.Repository) *Server {
 	return &Server{repo: repo}
 }
@@ -28,9 +30,8 @@ func (s *Server) publish() http.HandlerFunc {
 		defer req.Body.Close()
 
 		var publishReq kitsune.PublishRequest
-		if err := json.NewDecoder(req.Body).Decode(&publishReq); err != nil {
+		if err := receiveJSON(res, req, &publishReq); err != nil {
 			zap.S().Errorw("Error marshalling request", "error", err)
-			http.Error(res, "Unable to unmarshal request", http.StatusBadRequest)
 			return
 		}
 
@@ -56,10 +57,8 @@ func (s *Server) publish() http.HandlerFunc {
 			return
 		}
 
-		res.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(res).Encode(&message); err != nil {
+		if err := sendJSON(res, &message); err != nil {
 			zap.S().Errorw("Error marshalling response", "error", err)
-			http.Error(res, "Error marshalling response", http.StatusInternalServerError)
 			return
 		}
 
@@ -75,7 +74,7 @@ func (s *Server) getMessage() http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		params := httprouter.ParamsFromContext(req.Context())
 
-		message, err := s.repo.RetrieveMessage(params.ByName("topic"), params.ByName("messageId"))
+		message, err := s.repo.GetMessage(params.ByName("topic"), params.ByName("messageId"))
 		if err != nil {
 			zap.S().Errorw("Error retrieving message", "error", err)
 			switch err {
@@ -87,10 +86,8 @@ func (s *Server) getMessage() http.HandlerFunc {
 			return
 		}
 
-		res.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(res).Encode(&message); err != nil {
+		if err := sendJSON(res, &message); err != nil {
 			zap.S().Errorw("Error marshalling response", "error", err)
-			http.Error(res, "Error marshalling response", http.StatusInternalServerError)
 			return
 		}
 	}
@@ -103,13 +100,12 @@ func (s *Server) poll() http.HandlerFunc {
 		topic := httprouter.ParamsFromContext(req.Context()).ByName("topic")
 
 		var pollReq kitsune.PollRequest
-		if err := json.NewDecoder(req.Body).Decode(&pollReq); err != nil {
+		if err := receiveJSON(res, req, &pollReq); err != nil {
 			zap.S().Errorw("Error marshalling request", "error", err)
-			http.Error(res, "Unable to unmarshal request", http.StatusBadRequest)
 			return
 		}
 
-		messages, err := s.repo.GetMessagesFromTopic(topic, pollReq)
+		messages, err := s.repo.PollTopic(topic, pollReq)
 		if err != nil {
 			zap.S().Errorw("Error polling messages", "error", err)
 			switch err {
@@ -122,10 +118,8 @@ func (s *Server) poll() http.HandlerFunc {
 			return
 		}
 
-		res.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(res).Encode(&messages); err != nil {
+		if err := sendJSON(res, &messages); err != nil {
 			zap.S().Errorw("Error marshalling response", "error", err)
-			http.Error(res, "Error marshalling response", http.StatusInternalServerError)
 			return
 		}
 
@@ -135,4 +129,23 @@ func (s *Server) poll() http.HandlerFunc {
 			"messagesReturned", len(messages),
 		)
 	}
+}
+
+func receiveJSON(res http.ResponseWriter, req *http.Request, v interface{}) error {
+	if err := json.NewDecoder(req.Body).Decode(v); err != nil {
+		http.Error(res, "Unable to unmarshal request", http.StatusBadRequest)
+		return err
+	}
+
+	return nil
+}
+
+func sendJSON(res http.ResponseWriter, v interface{}) error {
+	res.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(res).Encode(v); err != nil {
+		http.Error(res, "Error marshalling response", http.StatusInternalServerError)
+		return err
+	}
+
+	return nil
 }

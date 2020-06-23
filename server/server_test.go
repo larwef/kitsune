@@ -24,11 +24,11 @@ func (r *RepositoryMock) PersistMessage(message *kitsune.Message) error {
 	return r.persistMessageHandler(message)
 }
 
-func (r *RepositoryMock) RetrieveMessage(topic, id string) (*kitsune.Message, error) {
+func (r *RepositoryMock) GetMessage(topic, id string) (*kitsune.Message, error) {
 	return r.retrieveMessageHandler(topic, id)
 }
 
-func (r *RepositoryMock) GetMessagesFromTopic(topicName string, req kitsune.PollRequest) ([]*kitsune.Message, error) {
+func (r *RepositoryMock) PollTopic(topicName string, req kitsune.PollRequest) ([]*kitsune.Message, error) {
 	return r.getMessageFromTopicHandler(topicName, req)
 }
 

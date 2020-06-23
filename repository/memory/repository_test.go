@@ -83,7 +83,7 @@ func TestRepository_RetrieveMessage(t *testing.T) {
 			}},
 	}
 
-	message, err := repo.RetrieveMessage("testTopic", "testId")
+	message, err := repo.GetMessage("testTopic", "testId")
 	assert.NoError(t, err)
 	assert.NotNil(t, message)
 }
@@ -93,7 +93,7 @@ func TestRepository_RetrieveMessage_MessageDoesntExist(t *testing.T) {
 		messages: map[string]*kitsune.Message{},
 	}
 
-	_, err := repo.RetrieveMessage("testTopic", "testId")
+	_, err := repo.GetMessage("testTopic", "testId")
 	assert.Equal(t, kitsune.ErrMessageNotFound, err)
 }
 
@@ -116,27 +116,27 @@ func TestRepository_GetMessagesFromTopic(t *testing.T) {
 		MaxNumberOfMessages: 2,
 	}
 
-	messages, err := repo.GetMessagesFromTopic("testTopic1", pollReq)
+	messages, err := repo.PollTopic("testTopic1", pollReq)
 	assert.NoError(t, err)
 	assert.Len(t, repo.subscriptions, 1)
 	assert.Len(t, messages, 2)
 	assert.Equal(t, "testId1", messages[0].ID)
 	assert.Equal(t, "testId2", messages[1].ID)
 
-	messages, err = repo.GetMessagesFromTopic("testTopic1", pollReq)
+	messages, err = repo.PollTopic("testTopic1", pollReq)
 	assert.NoError(t, err)
 	assert.Len(t, repo.subscriptions, 1)
 	assert.Len(t, messages, 2)
 	assert.Equal(t, "testId3", messages[0].ID)
 	assert.Equal(t, "testId4", messages[1].ID)
 
-	messages, err = repo.GetMessagesFromTopic("testTopic1", pollReq)
+	messages, err = repo.PollTopic("testTopic1", pollReq)
 	assert.NoError(t, err)
 	assert.Len(t, repo.subscriptions, 1)
 	assert.Len(t, messages, 1)
 	assert.Equal(t, "testId5", messages[0].ID)
 
-	messages, err = repo.GetMessagesFromTopic("testTopic1", pollReq)
+	messages, err = repo.PollTopic("testTopic1", pollReq)
 	assert.NoError(t, err)
 	assert.Len(t, repo.subscriptions, 1)
 	assert.Len(t, messages, 0)
@@ -153,6 +153,6 @@ func TestRepository_GetMessagesFromTopic_TopicDoesntExist(t *testing.T) {
 		MaxNumberOfMessages: 2,
 	}
 
-	_, err := repo.GetMessagesFromTopic("testTopic1", pollReq)
+	_, err := repo.PollTopic("testTopic1", pollReq)
 	assert.Equal(t, kitsune.ErrTopicNotFound, err)
 }

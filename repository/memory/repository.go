@@ -13,12 +13,14 @@ type subscription struct {
 	index uint
 }
 
+// Repository is a simple in memory repository.
 type Repository struct {
 	topics        map[string]*topic
 	messages      map[string]*kitsune.Message
 	subscriptions map[string]*subscription
 }
 
+// NewRepository returns a new in memory Repository.
 func NewRepository() *Repository {
 	return &Repository{
 		topics:        map[string]*topic{},
@@ -27,6 +29,7 @@ func NewRepository() *Repository {
 	}
 }
 
+// PersistMessage persists a message in the repository.
 func (r *Repository) PersistMessage(message *kitsune.Message) error {
 	if _, exists := r.messages[message.ID]; exists {
 		return kitsune.ErrDuplicateMessage
@@ -45,7 +48,8 @@ func (r *Repository) PersistMessage(message *kitsune.Message) error {
 	return nil
 }
 
-func (r *Repository) RetrieveMessage(topic, id string) (*kitsune.Message, error) {
+// GetMessage retrieves a spesific message from the repository.
+func (r *Repository) GetMessage(topic, id string) (*kitsune.Message, error) {
 	message, exists := r.messages[id]
 	if !exists {
 		return nil, kitsune.ErrMessageNotFound
@@ -54,7 +58,8 @@ func (r *Repository) RetrieveMessage(topic, id string) (*kitsune.Message, error)
 	return message, nil
 }
 
-func (r *Repository) GetMessagesFromTopic(topicName string, req kitsune.PollRequest) ([]*kitsune.Message, error) {
+// PollTopic polls messages from a topic as specified in the Pollrequest.
+func (r *Repository) PollTopic(topicName string, req kitsune.PollRequest) ([]*kitsune.Message, error) {
 	s, subscriptionExists := r.subscriptions[req.SubscriptionName]
 	if !subscriptionExists {
 		topic, topicExists := r.topics[topicName]

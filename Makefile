@@ -6,6 +6,9 @@ SRC=cmd/$(APP_NAME)/main.go
 
 all: test build-linux build-mac build-windows
 
+run:
+	go run cmd/kitsune/main.go
+
 # PHONY used to mitigate conflict with dir name test
 .PHONY: test
 test:

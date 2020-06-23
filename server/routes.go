@@ -5,6 +5,7 @@ import (
 	"net/http"
 )
 
+// GetRouter sets up the routes and eventual middleware.
 func (s *Server) GetRouter() http.Handler {
 	router := httprouter.New()
 
