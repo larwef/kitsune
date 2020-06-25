@@ -131,6 +131,39 @@ func (s *Server) poll() http.HandlerFunc {
 	}
 }
 
+func (s *Server) setSubscriptionPosition() http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		defer req.Body.Close()
+
+		topic := httprouter.ParamsFromContext(req.Context()).ByName("topic")
+
+		var setSubPosReq kitsune.SubscriptionPositionRequest
+		if err := receiveJSON(res, req, &setSubPosReq); err != nil {
+			zap.S().Errorw("Error marshalling request", "error", err)
+			return
+		}
+
+		err := s.repo.SetSubscriptionPosition(topic, setSubPosReq)
+		if err != nil {
+			zap.S().Errorw("Error setting subscription position", "error", err)
+			switch err {
+			case kitsune.ErrTopicNotFound:
+				http.Error(res, "Topic not found", http.StatusNotFound)
+			default:
+				http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+			}
+
+			return
+		}
+
+		zap.S().Infow("Subscription position set",
+			"topic", topic,
+			"topic", topic,
+			"subscription", setSubPosReq.SubscriptionName,
+		)
+	}
+}
+
 func receiveJSON(res http.ResponseWriter, req *http.Request, v interface{}) error {
 	if err := json.NewDecoder(req.Body).Decode(v); err != nil {
 		http.Error(res, "Unable to unmarshal request", http.StatusBadRequest)

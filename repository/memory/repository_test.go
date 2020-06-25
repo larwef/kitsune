@@ -153,6 +153,100 @@ func TestRepository_GetMessagesFromTopic_TopicDoesntExist(t *testing.T) {
 		MaxNumberOfMessages: 2,
 	}
 
-	_, err := repo.PollTopic("testTopic1", pollReq)
+	_, err := repo.PollTopic("testTopic", pollReq)
 	assert.Equal(t, kitsune.ErrTopicNotFound, err)
+}
+
+func TestRepository_SetSubscriptionPosition(t *testing.T) {
+	repo := &Repository{
+		topics: map[string]*topic{
+			"testTopic": {[]*kitsune.Message{
+				{ID: "testId1", PublishedTime: timeFromStr("2020-06-24T19:00:00.000000Z"), Payload: "testPayload1"},
+				{ID: "testId2", PublishedTime: timeFromStr("2020-06-24T20:00:00.000000Z"), Payload: "testPayload2"},
+				{ID: "testId3", PublishedTime: timeFromStr("2020-06-24T21:00:00.000000Z"), Payload: "testPayload3"},
+				{ID: "testId4", PublishedTime: timeFromStr("2020-06-25T19:00:00.000000Z"), Payload: "testPayload4"},
+				{ID: "testId5", PublishedTime: timeFromStr("2020-06-25T20:00:00.000000Z"), Payload: "testPayload5"},
+			}},
+		},
+		subscriptions: map[string]*subscription{},
+	}
+
+	posReq := kitsune.SubscriptionPositionRequest{
+		SubscriptionName: "testSubscription",
+		MessageID:        "someId",
+	}
+
+	// Setting a non existing subscription should create it
+	err := repo.SetSubscriptionPosition("testTopic", posReq)
+	assert.NoError(t, err)
+	assert.Len(t, repo.subscriptions, 1)
+
+	pollReq := kitsune.PollRequest{
+		SubscriptionName:    "testSubscription",
+		MaxNumberOfMessages: 3,
+	}
+
+	// Poll some messages
+	messages, err := repo.PollTopic("testTopic", pollReq)
+	assert.NoError(t, err)
+	assert.Len(t, repo.subscriptions, 1)
+	assert.Len(t, messages, 3)
+
+	// Should set to first message since neither time or id is found
+	err = repo.SetSubscriptionPosition("testTopic", posReq)
+	assert.NoError(t, err)
+
+	// Poll some messages. First message should now be the first returned
+	messages, err = repo.PollTopic("testTopic", pollReq)
+	assert.NoError(t, err)
+	assert.Len(t, repo.subscriptions, 1)
+	assert.Len(t, messages, 3)
+	assert.Equal(t, "testId1", messages[0].ID)
+
+	posReq.MessageID = "testId2"
+	// Should set to second message based on id
+	err = repo.SetSubscriptionPosition("testTopic", posReq)
+	assert.NoError(t, err)
+
+	// Poll some messages. Second message should now be the first returned
+	messages, err = repo.PollTopic("testTopic", pollReq)
+	assert.NoError(t, err)
+	assert.Len(t, repo.subscriptions, 1)
+	assert.Len(t, messages, 3)
+	assert.Equal(t, "testId2", messages[0].ID)
+
+	posReq.MessageID = "testId2"
+	pubTime := timeFromStr("2020-06-25T19:00:00.000000Z")
+	posReq.PublishedTime = &pubTime
+	// Should set to fourth message based on time.
+	err = repo.SetSubscriptionPosition("testTopic", posReq)
+	assert.NoError(t, err)
+
+	// Poll some messages. Fourth message should now be the first returned
+	messages, err = repo.PollTopic("testTopic", pollReq)
+	assert.NoError(t, err)
+	assert.Len(t, repo.subscriptions, 1)
+	assert.Len(t, messages, 2)
+	assert.Equal(t, "testId4", messages[0].ID)
+}
+
+func TestRepository_SetSubscriptionPosition_TopicDoesntExist(t *testing.T) {
+	repo := &Repository{}
+
+	req := kitsune.SubscriptionPositionRequest{
+		SubscriptionName: "testSubscription",
+		MessageID:        "someId",
+	}
+
+	err := repo.SetSubscriptionPosition("testTopic", req)
+	assert.Equal(t, kitsune.ErrTopicNotFound, err)
+}
+
+func timeFromStr(s string) time.Time {
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		panic("not able to parse time from string: " + s)
+	}
+
+	return t
 }

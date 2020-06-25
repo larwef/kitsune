@@ -60,15 +60,15 @@ func (r *Repository) GetMessage(topic, id string) (*kitsune.Message, error) {
 
 // PollTopic polls messages from a topic as specified in the Pollrequest.
 func (r *Repository) PollTopic(topicName string, req kitsune.PollRequest) ([]*kitsune.Message, error) {
+	t, topicExists := r.topics[topicName]
+	if !topicExists {
+		return nil, kitsune.ErrTopicNotFound
+	}
+
 	s, subscriptionExists := r.subscriptions[req.SubscriptionName]
 	if !subscriptionExists {
-		topic, topicExists := r.topics[topicName]
-		if !topicExists {
-			return nil, kitsune.ErrTopicNotFound
-		}
-
 		r.subscriptions[req.SubscriptionName] = &subscription{
-			topic: topic,
+			topic: t,
 			index: 0,
 		}
 
@@ -82,6 +82,35 @@ func (r *Repository) PollTopic(topicName string, req kitsune.PollRequest) ([]*ki
 	s.index = uint(end)
 
 	return messages, nil
+}
+
+// SetSubscriptionPosition is used to set the subscription position to a desired message in the stream.
+func (r *Repository) SetSubscriptionPosition(topicName string, req kitsune.SubscriptionPositionRequest) error {
+	t, topicExists := r.topics[topicName]
+	if !topicExists {
+		return kitsune.ErrTopicNotFound
+	}
+
+	s, subscriptionExists := r.subscriptions[req.SubscriptionName]
+	if !subscriptionExists {
+		r.subscriptions[req.SubscriptionName] = &subscription{
+			topic: t,
+			index: 0,
+		}
+
+		s = r.subscriptions[req.SubscriptionName]
+	}
+
+	for i := range t.messages {
+		index := len(t.messages) - i - 1
+		if t.messages[index].ID == req.MessageID || (req.PublishedTime != nil && t.messages[index-1].PublishedTime.Before(*req.PublishedTime)) {
+			s.index = uint(index)
+			return nil
+		}
+	}
+
+	s.index = 0
+	return nil
 }
 
 func min(a, b int) int {

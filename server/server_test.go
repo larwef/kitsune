@@ -15,9 +15,10 @@ import (
 
 type RepositoryMock struct {
 	mock.Mock
-	persistMessageHandler      func(*kitsune.Message) error
-	retrieveMessageHandler     func(string, string) (*kitsune.Message, error)
-	getMessageFromTopicHandler func(string, kitsune.PollRequest) ([]*kitsune.Message, error)
+	persistMessageHandler          func(*kitsune.Message) error
+	retrieveMessageHandler         func(string, string) (*kitsune.Message, error)
+	getMessageFromTopicHandler     func(string, kitsune.PollRequest) ([]*kitsune.Message, error)
+	setSubscriptionPositionHandler func(string, kitsune.SubscriptionPositionRequest) error
 }
 
 func (r *RepositoryMock) PersistMessage(message *kitsune.Message) error {
@@ -32,6 +33,10 @@ func (r *RepositoryMock) PollTopic(topicName string, req kitsune.PollRequest) ([
 	return r.getMessageFromTopicHandler(topicName, req)
 }
 
+func (r *RepositoryMock) SetSubscriptionPosition(topic string, req kitsune.SubscriptionPositionRequest) error {
+	return r.setSubscriptionPositionHandler(topic, req)
+}
+
 func TestServer(t *testing.T) {
 	tests := []struct {
 		payload                    interface{}
@@ -40,6 +45,7 @@ func TestServer(t *testing.T) {
 		persistMessageHandler      func(*kitsune.Message) error
 		retrieveMessageHandler     func(string, string) (*kitsune.Message, error)
 		getMessageFromTopicHandler func(string, kitsune.PollRequest) ([]*kitsune.Message, error)
+		setSubscriptionPosition    func(string, kitsune.SubscriptionPositionRequest) error
 		expectedStatus             int
 		expectedPayload            string
 	}{
@@ -128,6 +134,33 @@ func TestServer(t *testing.T) {
 			expectedStatus:  http.StatusNotFound,
 			expectedPayload: "Topic not found\n",
 		},
+		// Settings
+		{
+			payload: &kitsune.SubscriptionPositionRequest{
+				SubscriptionName: "test",
+				MessageID:        "messageId",
+			},
+			url:    "/settings/testTopic",
+			method: http.MethodPost,
+			setSubscriptionPosition: func(s string, request kitsune.SubscriptionPositionRequest) error {
+				return nil
+			},
+			expectedStatus:  http.StatusOK,
+			expectedPayload: "",
+		},
+		{
+			payload: &kitsune.SubscriptionPositionRequest{
+				SubscriptionName: "test",
+				MessageID:        "messageId",
+			},
+			url:    "/settings/testTopic",
+			method: http.MethodPost,
+			setSubscriptionPosition: func(s string, request kitsune.SubscriptionPositionRequest) error {
+				return kitsune.ErrTopicNotFound
+			},
+			expectedStatus:  http.StatusNotFound,
+			expectedPayload: "Topic not found\n",
+		},
 	}
 
 	now = func() time.Time {
@@ -149,9 +182,10 @@ func TestServer(t *testing.T) {
 
 		res := httptest.NewRecorder()
 		server := NewServer(&RepositoryMock{
-			persistMessageHandler:      test.persistMessageHandler,
-			retrieveMessageHandler:     test.retrieveMessageHandler,
-			getMessageFromTopicHandler: test.getMessageFromTopicHandler,
+			persistMessageHandler:          test.persistMessageHandler,
+			retrieveMessageHandler:         test.retrieveMessageHandler,
+			getMessageFromTopicHandler:     test.getMessageFromTopicHandler,
+			setSubscriptionPositionHandler: test.setSubscriptionPosition,
 		})
 
 		server.GetRouter().ServeHTTP(res, req)
