@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -17,6 +18,9 @@ import (
 var Version = "No version provided"
 
 func main() {
+	if err := os.Setenv("TZ", "UTC"); err != nil {
+		log.Fatal(err)
+	}
 	setupLogger()
 	defer zap.L().Sync()
 	setupConfig()
