@@ -48,7 +48,7 @@ func (s *Server) publish() http.HandlerFunc {
 		if err := s.repo.PersistMessage(&message); err != nil {
 			zap.S().Errorw("Error persisting message", "error", err)
 			switch err {
-			case kitsune.ErrDuplicateMessage:
+			case repository.ErrDuplicateMessage:
 				http.Error(res, "Duplicate message id", http.StatusConflict)
 			default:
 				http.Error(res, "Internal Server Error", http.StatusInternalServerError)
@@ -78,7 +78,7 @@ func (s *Server) getMessage() http.HandlerFunc {
 		if err != nil {
 			zap.S().Errorw("Error retrieving message", "error", err)
 			switch err {
-			case kitsune.ErrMessageNotFound:
+			case repository.ErrMessageNotFound:
 				http.Error(res, "Message not found", http.StatusNotFound)
 			default:
 				http.Error(res, "Not Found", http.StatusNotFound)
@@ -109,7 +109,7 @@ func (s *Server) poll() http.HandlerFunc {
 		if err != nil {
 			zap.S().Errorw("Error polling messages", "error", err)
 			switch err {
-			case kitsune.ErrTopicNotFound:
+			case repository.ErrTopicNotFound:
 				http.Error(res, "Topic not found", http.StatusNotFound)
 			default:
 				http.Error(res, "Internal Server Error", http.StatusInternalServerError)
@@ -147,7 +147,7 @@ func (s *Server) setSubscriptionPosition() http.HandlerFunc {
 		if err != nil {
 			zap.S().Errorw("Error setting subscription position", "error", err)
 			switch err {
-			case kitsune.ErrTopicNotFound:
+			case repository.ErrTopicNotFound:
 				http.Error(res, "Topic not found", http.StatusNotFound)
 			default:
 				http.Error(res, "Internal Server Error", http.StatusInternalServerError)

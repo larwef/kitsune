@@ -2,6 +2,7 @@ package memory
 
 import (
 	"github.com/larwef/kitsune"
+	"github.com/larwef/kitsune/repository"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -69,7 +70,7 @@ func TestRepository_PersistMessage_Duplicate(t *testing.T) {
 		Topic:         "testTopic1",
 		Payload:       "testPayload1",
 	})
-	assert.Equal(t, kitsune.ErrDuplicateMessage, err)
+	assert.Equal(t, repository.ErrDuplicateMessage, err)
 }
 
 func TestRepository_RetrieveMessage(t *testing.T) {
@@ -94,7 +95,7 @@ func TestRepository_RetrieveMessage_MessageDoesntExist(t *testing.T) {
 	}
 
 	_, err := repo.GetMessage("testTopic", "testId")
-	assert.Equal(t, kitsune.ErrMessageNotFound, err)
+	assert.Equal(t, repository.ErrMessageNotFound, err)
 }
 
 func TestRepository_GetMessagesFromTopic(t *testing.T) {
@@ -154,7 +155,7 @@ func TestRepository_GetMessagesFromTopic_TopicDoesntExist(t *testing.T) {
 	}
 
 	_, err := repo.PollTopic("testTopic", pollReq)
-	assert.Equal(t, kitsune.ErrTopicNotFound, err)
+	assert.Equal(t, repository.ErrTopicNotFound, err)
 }
 
 func TestRepository_SetSubscriptionPosition(t *testing.T) {
@@ -215,7 +216,7 @@ func TestRepository_SetSubscriptionPosition(t *testing.T) {
 	assert.Len(t, messages, 3)
 	assert.Equal(t, "testId2", messages[0].ID)
 
-	posReq.MessageID = "testId2"
+	posReq.MessageID = ""
 	pubTime := timeFromStr("2020-06-25T19:00:00.000000Z")
 	posReq.PublishedTime = &pubTime
 	// Should set to fourth message based on time.
@@ -239,7 +240,7 @@ func TestRepository_SetSubscriptionPosition_TopicDoesntExist(t *testing.T) {
 	}
 
 	err := repo.SetSubscriptionPosition("testTopic", req)
-	assert.Equal(t, kitsune.ErrTopicNotFound, err)
+	assert.Equal(t, repository.ErrTopicNotFound, err)
 }
 
 func timeFromStr(s string) time.Time {

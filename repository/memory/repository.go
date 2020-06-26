@@ -2,6 +2,7 @@ package memory
 
 import (
 	"github.com/larwef/kitsune"
+	"github.com/larwef/kitsune/repository"
 )
 
 type topic struct {
@@ -32,7 +33,7 @@ func NewRepository() *Repository {
 // PersistMessage persists a message in the repository.
 func (r *Repository) PersistMessage(message *kitsune.Message) error {
 	if _, exists := r.messages[message.ID]; exists {
-		return kitsune.ErrDuplicateMessage
+		return repository.ErrDuplicateMessage
 	}
 
 	r.messages[message.ID] = message
@@ -52,7 +53,7 @@ func (r *Repository) PersistMessage(message *kitsune.Message) error {
 func (r *Repository) GetMessage(topic, id string) (*kitsune.Message, error) {
 	message, exists := r.messages[id]
 	if !exists {
-		return nil, kitsune.ErrMessageNotFound
+		return nil, repository.ErrMessageNotFound
 	}
 
 	return message, nil
@@ -62,7 +63,7 @@ func (r *Repository) GetMessage(topic, id string) (*kitsune.Message, error) {
 func (r *Repository) PollTopic(topicName string, req kitsune.PollRequest) ([]*kitsune.Message, error) {
 	t, topicExists := r.topics[topicName]
 	if !topicExists {
-		return nil, kitsune.ErrTopicNotFound
+		return nil, repository.ErrTopicNotFound
 	}
 
 	s, subscriptionExists := r.subscriptions[req.SubscriptionName]
@@ -86,9 +87,13 @@ func (r *Repository) PollTopic(topicName string, req kitsune.PollRequest) ([]*ki
 
 // SetSubscriptionPosition is used to set the subscription position to a desired message in the stream.
 func (r *Repository) SetSubscriptionPosition(topicName string, req kitsune.SubscriptionPositionRequest) error {
+	if req.MessageID != "" && req.PublishedTime != nil {
+		return repository.ErrCantSpecifyIDAndTime
+	}
+
 	t, topicExists := r.topics[topicName]
 	if !topicExists {
-		return kitsune.ErrTopicNotFound
+		return repository.ErrTopicNotFound
 	}
 
 	s, subscriptionExists := r.subscriptions[req.SubscriptionName]

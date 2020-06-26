@@ -1,17 +1,7 @@
 package kitsune
 
 import (
-	"errors"
 	"time"
-)
-
-var (
-	// ErrDuplicateMessage is returned if message resource already exists.
-	ErrDuplicateMessage = errors.New("duplicate message id")
-	// ErrTopicNotFound is returned when a topic doesnt exist.
-	ErrTopicNotFound = errors.New("topic not found")
-	// ErrMessageNotFound is returned when message resource cant be found.
-	ErrMessageNotFound = errors.New("message not found")
 )
 
 // PublishRequest is used to publish a message.

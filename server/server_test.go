@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/larwef/kitsune"
+	"github.com/larwef/kitsune/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"io/ioutil"
@@ -69,7 +70,7 @@ func TestServer(t *testing.T) {
 			url:    "/publish/testTopic",
 			method: http.MethodPost,
 			persistMessageHandler: func(message *kitsune.Message) error {
-				return kitsune.ErrDuplicateMessage
+				return repository.ErrDuplicateMessage
 			},
 			expectedStatus:  http.StatusConflict,
 			expectedPayload: "Duplicate message id\n",
@@ -102,7 +103,7 @@ func TestServer(t *testing.T) {
 			url:     "/testTopic/someId",
 			method:  http.MethodGet,
 			retrieveMessageHandler: func(topic, id string) (*kitsune.Message, error) {
-				return nil, kitsune.ErrMessageNotFound
+				return nil, repository.ErrMessageNotFound
 			},
 			expectedStatus:  http.StatusNotFound,
 			expectedPayload: "Message not found\n",
@@ -129,7 +130,7 @@ func TestServer(t *testing.T) {
 			url:    "/poll/testTopic",
 			method: http.MethodPost,
 			getMessageFromTopicHandler: func(topic string, req kitsune.PollRequest) ([]*kitsune.Message, error) {
-				return []*kitsune.Message{}, kitsune.ErrTopicNotFound
+				return []*kitsune.Message{}, repository.ErrTopicNotFound
 			},
 			expectedStatus:  http.StatusNotFound,
 			expectedPayload: "Topic not found\n",
@@ -156,7 +157,7 @@ func TestServer(t *testing.T) {
 			url:    "/settings/testTopic",
 			method: http.MethodPost,
 			setSubscriptionPosition: func(s string, request kitsune.SubscriptionPositionRequest) error {
-				return kitsune.ErrTopicNotFound
+				return repository.ErrTopicNotFound
 			},
 			expectedStatus:  http.StatusNotFound,
 			expectedPayload: "Topic not found\n",
