@@ -5,123 +5,50 @@ import (
 	"github.com/larwef/kitsune/repository"
 )
 
-type topic struct {
-	messages []*kitsune.Message
-}
-
-type subscription struct {
-	topic *topic
-	index uint
-}
-
 // Repository is a simple in memory repository.
 type Repository struct {
-	topics        map[string]*topic
-	messages      map[string]*kitsune.Message
-	subscriptions map[string]*subscription
+	topics   map[string]*kitsune.Topic
+	messages map[string][]*kitsune.Message
 }
 
 // NewRepository returns a new in memory Repository.
 func NewRepository() *Repository {
 	return &Repository{
-		topics:        map[string]*topic{},
-		messages:      map[string]*kitsune.Message{},
-		subscriptions: map[string]*subscription{},
+		topics:   map[string]*kitsune.Topic{},
+		messages: map[string][]*kitsune.Message{},
 	}
 }
 
-// PersistMessage persists a message in the repository.
-func (r *Repository) PersistMessage(message *kitsune.Message) error {
-	if _, exists := r.messages[message.ID]; exists {
-		return repository.ErrDuplicateMessage
+// AddMessage persists a message in the repository.
+func (r *Repository) AddMessage(message *kitsune.Message) error {
+	if _, exists := r.topics[message.Topic]; !exists {
+		r.topics[message.Topic] = &kitsune.Topic{
+			ID: message.Topic,
+		}
 	}
 
-	r.messages[message.ID] = message
-
-	t, exists := r.topics[message.Topic]
-	if !exists {
-		r.topics[message.Topic] = &topic{messages: []*kitsune.Message{message}}
-		return nil
+	for _, m := range r.messages[message.Topic] {
+		if m.ID == message.ID {
+			return repository.ErrDuplicate
+		}
 	}
 
-	t.messages = append(t.messages, message)
+	r.messages[message.Topic] = append(r.messages[message.Topic], message)
 
 	return nil
 }
 
 // GetMessage retrieves a spesific message from the repository.
 func (r *Repository) GetMessage(topic, id string) (*kitsune.Message, error) {
-	message, exists := r.messages[id]
-	if !exists {
-		return nil, repository.ErrMessageNotFound
-	}
-
-	return message, nil
-}
-
-// PollTopic polls messages from a topic as specified in the Pollrequest.
-func (r *Repository) PollTopic(topicName string, req kitsune.PollRequest) ([]*kitsune.Message, error) {
-	t, topicExists := r.topics[topicName]
-	if !topicExists {
+	if _, exists := r.topics[topic]; !exists {
 		return nil, repository.ErrTopicNotFound
 	}
 
-	s, subscriptionExists := r.subscriptions[req.SubscriptionName]
-	if !subscriptionExists {
-		r.subscriptions[req.SubscriptionName] = &subscription{
-			topic: t,
-			index: 0,
-		}
-
-		s = r.subscriptions[req.SubscriptionName]
-	}
-
-	start := s.index
-	end := min(int(s.index+req.MaxNumberOfMessages), len(s.topic.messages))
-
-	messages := s.topic.messages[start:end]
-	s.index = uint(end)
-
-	return messages, nil
-}
-
-// SetSubscriptionPosition is used to set the subscription position to a desired message in the stream.
-func (r *Repository) SetSubscriptionPosition(topicName string, req kitsune.SubscriptionPositionRequest) error {
-	if req.MessageID != "" && req.PublishedTime != nil {
-		return repository.ErrCantSpecifyIDAndTime
-	}
-
-	t, topicExists := r.topics[topicName]
-	if !topicExists {
-		return repository.ErrTopicNotFound
-	}
-
-	s, subscriptionExists := r.subscriptions[req.SubscriptionName]
-	if !subscriptionExists {
-		r.subscriptions[req.SubscriptionName] = &subscription{
-			topic: t,
-			index: 0,
-		}
-
-		s = r.subscriptions[req.SubscriptionName]
-	}
-
-	for i := range t.messages {
-		index := len(t.messages) - i - 1
-		if t.messages[index].ID == req.MessageID || (req.PublishedTime != nil && t.messages[index-1].PublishedTime.Before(*req.PublishedTime)) {
-			s.index = uint(index)
-			return nil
+	for _, message := range r.messages[topic] {
+		if message.ID == id {
+			return message, nil
 		}
 	}
 
-	s.index = 0
-	return nil
-}
-
-func min(a, b int) int {
-	if b < a {
-		return b
-	}
-
-	return a
+	return nil, repository.ErrMessageNotFound
 }

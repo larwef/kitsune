@@ -9,10 +9,8 @@ import (
 func (s *Server) GetRouter() http.Handler {
 	router := httprouter.New()
 
-	router.Handler(http.MethodPost, "/publish/:topic", s.publish())
-	router.Handler(http.MethodPost, "/poll/:topic", s.poll())
-	router.Handler(http.MethodGet, "/:topic/:messageId", s.getMessage())
-	router.Handler(http.MethodPost, "/settings/:topic", s.setSubscriptionPosition())
+	router.Handler(http.MethodPost, "/topic/:topicId", s.publish())
+	router.Handler(http.MethodGet, "/topic/:topicId/:messageId", s.getMessage())
 
 	return router
 }
