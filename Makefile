@@ -44,6 +44,7 @@ release: test build-linux build-mac build-windows
 
 clean:
 	rm -rf $(TARGET)
+	rm coverage.out
 
 rebuild:
 	clean all

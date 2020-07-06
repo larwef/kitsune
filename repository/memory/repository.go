@@ -21,7 +21,7 @@ func NewRepository() *Repository {
 
 // GetTopics lists all registered topics.
 func (r *Repository) GetTopics() ([]*kitsune.Topic, error) {
-	var topics []*kitsune.Topic
+	topics := make([]*kitsune.Topic, 0)
 
 	for _, v := range r.topics {
 		topics = append(topics, v)
