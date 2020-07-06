@@ -14,8 +14,18 @@ import (
 )
 
 type RepositoryMock struct {
+	getTopicsHandler  func() ([]*kitsune.Topic, error)
+	getTopicHandler   func(string) (*kitsune.Topic, error)
 	addMessageHandler func(*kitsune.Message) error
 	getMessageHandler func(string, string) (*kitsune.Message, error)
+}
+
+func (r *RepositoryMock) GetTopics() ([]*kitsune.Topic, error) {
+	return r.getTopicsHandler()
+}
+
+func (r *RepositoryMock) GetTopic(topic string) (*kitsune.Topic, error) {
+	return r.getTopicHandler(topic)
 }
 
 func (r *RepositoryMock) AddMessage(message *kitsune.Message) error {

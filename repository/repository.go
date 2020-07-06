@@ -23,6 +23,8 @@ type Repository interface {
 
 // TopicRepository defines the behaviour to be satified by a repository.
 type TopicRepository interface {
+	GetTopics() ([]*kitsune.Topic, error)
+	GetTopic(topic string) (*kitsune.Topic, error)
 	AddMessage(message *kitsune.Message) error
 	GetMessage(topic, id string) (*kitsune.Message, error)
 }

@@ -19,6 +19,27 @@ func NewRepository() *Repository {
 	}
 }
 
+// GetTopics lists all registered topics.
+func (r *Repository) GetTopics() ([]*kitsune.Topic, error) {
+	var topics []*kitsune.Topic
+
+	for _, v := range r.topics {
+		topics = append(topics, v)
+	}
+
+	return topics, nil
+}
+
+// GetTopic shows a specific topic.
+func (r *Repository) GetTopic(topicID string) (*kitsune.Topic, error) {
+	topic, exists := r.topics[topicID]
+	if !exists {
+		return nil, repository.ErrTopicNotFound
+	}
+
+	return topic, nil
+}
+
 // AddMessage persists a message in the repository.
 func (r *Repository) AddMessage(message *kitsune.Message) error {
 	if _, exists := r.topics[message.Topic]; !exists {
