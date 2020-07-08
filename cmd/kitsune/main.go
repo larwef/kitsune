@@ -25,9 +25,7 @@ func main() {
 	defer zap.L().Sync()
 	setupConfig()
 
-	zap.S().Infow("Staring application",
-		"version", Version,
-	)
+	zap.S().Info("Staring application")
 
 	ks := server.NewServer(memory.NewRepository())
 
@@ -62,6 +60,9 @@ func setupLogger() {
 	zapConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	logConfig := zap.NewProductionConfig()
 	logConfig.EncoderConfig = zapConfig
+	logConfig.InitialFields = map[string]interface{}{
+		"version": Version,
+	}
 
 	logger, err := logConfig.Build()
 	if err != nil {
