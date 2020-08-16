@@ -7,6 +7,7 @@ type PublishRequest struct {
 	Properties map[string]string `json:"properties"`
 	EventTime  *time.Time        `json:"eventTime"`
 	Payload    string            `json:"payload"`
+	Topics     []string          `json:"topics"`
 }
 
 // PollRequest is used to poll messages from a topic.

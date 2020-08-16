@@ -17,17 +17,84 @@ var id = func() string { return uuid.New().String() }
 
 // Server holds all the http handlers.
 type Server struct {
-	repo repository.Repository
+	MessageRepo      repository.MessageRepository
+	TopicRepo        repository.TopicRepository
+	SubscriptionRepo repository.SubscriptionRepository
 }
 
-// NewServer returns a new Server object.
-func NewServer(repo repository.Repository) *Server {
-	return &Server{repo: repo}
+func (s *Server) addMessage() http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		defer req.Body.Close()
+
+		var publishReq PublishRequest
+		if err := receiveJSON(res, req, &publishReq); err != nil {
+			zap.S().Errorw("Error marshalling request", "error", err)
+			return
+		}
+
+		message := kitsune.Message{
+			ID:            id(),
+			PublishedTime: now(),
+			Properties:    publishReq.Properties,
+			EventTime:     publishReq.EventTime,
+			Payload:       publishReq.Payload,
+		}
+
+		if err := s.MessageRepo.AddMessage(&message); err != nil {
+			zap.S().Errorw("Error persisting message", "error", err)
+			switch err {
+			case repository.ErrDuplicate:
+				http.Error(res, "Duplicate message id", http.StatusConflict)
+			default:
+				http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+			}
+
+			return
+		}
+
+		// TODO: Add message to topics.
+
+		if err := sendJSON(res, &message); err != nil {
+			zap.S().Errorw("Error marshalling response", "error", err)
+			return
+		}
+
+		zap.S().Infow("Message succsessfully published",
+			"id", message.ID,
+			"publishedTime", message.PublishedTime,
+		)
+	}
+}
+
+func (s *Server) getMessage() http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		params := httprouter.ParamsFromContext(req.Context())
+		messageID := params.ByName("messageId")
+
+		message, err := s.MessageRepo.GetMessage(messageID)
+		if err != nil {
+			zap.S().Errorw("Error retrieving message", "error", err)
+			switch err {
+			case repository.ErrTopicNotFound:
+				http.Error(res, "Topic not found", http.StatusNotFound)
+			case repository.ErrMessageNotFound:
+				http.Error(res, "Message not found", http.StatusNotFound)
+			default:
+				http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		if err := sendJSON(res, &message); err != nil {
+			zap.S().Errorw("Error marshalling response", "error", err)
+			return
+		}
+	}
 }
 
 func (s *Server) getTopics() http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		topics, err := s.repo.GetTopics()
+		topics, err := s.TopicRepo.GetTopics()
 		if err != nil {
 			zap.S().Errorw("Error retrieving topics", "error", err)
 			http.Error(res, "Internal Server Error", http.StatusInternalServerError)
@@ -46,7 +113,7 @@ func (s *Server) getTopic() http.HandlerFunc {
 		params := httprouter.ParamsFromContext(req.Context())
 		topicID := params.ByName("topicId")
 
-		topic, err := s.repo.GetTopic(topicID)
+		topic, err := s.TopicRepo.GetTopic(topicID)
 		if err != nil {
 			zap.S().Errorw("Error retrieving topic", "error", err)
 			switch err {
@@ -59,80 +126,6 @@ func (s *Server) getTopic() http.HandlerFunc {
 		}
 
 		if err := sendJSON(res, &topic); err != nil {
-			zap.S().Errorw("Error marshalling response", "error", err)
-			return
-		}
-	}
-}
-
-func (s *Server) addMessage() http.HandlerFunc {
-	return func(res http.ResponseWriter, req *http.Request) {
-		defer req.Body.Close()
-
-		var publishReq PublishRequest
-		if err := receiveJSON(res, req, &publishReq); err != nil {
-			zap.S().Errorw("Error marshalling request", "error", err)
-			return
-		}
-
-		params := httprouter.ParamsFromContext(req.Context())
-		topic := params.ByName("topicId")
-
-		message := kitsune.Message{
-			ID:            id(),
-			PublishedTime: now(),
-			Properties:    publishReq.Properties,
-			EventTime:     publishReq.EventTime,
-			Topic:         topic,
-			Payload:       publishReq.Payload,
-		}
-
-		if err := s.repo.AddMessage(&message); err != nil {
-			zap.S().Errorw("Error persisting message", "error", err)
-			switch err {
-			case repository.ErrDuplicate:
-				http.Error(res, "Duplicate message id", http.StatusConflict)
-			default:
-				http.Error(res, "Internal Server Error", http.StatusInternalServerError)
-			}
-
-			return
-		}
-
-		if err := sendJSON(res, &message); err != nil {
-			zap.S().Errorw("Error marshalling response", "error", err)
-			return
-		}
-
-		zap.S().Infow("Message succsessfully published",
-			"topic", message.Topic,
-			"id", message.ID,
-			"publishedTime", message.PublishedTime,
-		)
-	}
-}
-
-func (s *Server) getMessage() http.HandlerFunc {
-	return func(res http.ResponseWriter, req *http.Request) {
-		params := httprouter.ParamsFromContext(req.Context())
-		topicID := params.ByName("topicId")
-		messageID := params.ByName("messageId")
-
-		message, err := s.repo.GetMessage(topicID, messageID)
-		if err != nil {
-			zap.S().Errorw("Error retrieving message", "error", err)
-			switch err {
-			case repository.ErrTopicNotFound:
-				http.Error(res, "Topic not found", http.StatusNotFound)
-			case repository.ErrMessageNotFound:
-				http.Error(res, "Message not found", http.StatusNotFound)
-			default:
-				http.Error(res, "Internal Server Error", http.StatusInternalServerError)
-			}
-			return
-		}
-
-		if err := sendJSON(res, &message); err != nil {
 			zap.S().Errorw("Error marshalling response", "error", err)
 			return
 		}

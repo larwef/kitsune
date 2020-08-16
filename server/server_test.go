@@ -18,7 +18,7 @@ type RepositoryMock struct {
 	getTopicsHandler  func() ([]*kitsune.Topic, error)
 	getTopicHandler   func(string) (*kitsune.Topic, error)
 	addMessageHandler func(*kitsune.Message) error
-	getMessageHandler func(string, string) (*kitsune.Message, error)
+	getMessageHandler func(string) (*kitsune.Message, error)
 }
 
 func (r *RepositoryMock) GetTopics() ([]*kitsune.Topic, error) {
@@ -33,102 +33,11 @@ func (r *RepositoryMock) AddMessage(message *kitsune.Message) error {
 	return r.addMessageHandler(message)
 }
 
-func (r *RepositoryMock) GetMessage(topic, id string) (*kitsune.Message, error) {
-	return r.getMessageHandler(topic, id)
+func (r *RepositoryMock) GetMessage(id string) (*kitsune.Message, error) {
+	return r.getMessageHandler(id)
 }
 
 // Tests
-func TestServer_GetTopics(t *testing.T) {
-	repo := &RepositoryMock{
-		getTopicsHandler: func() ([]*kitsune.Topic, error) {
-			return []*kitsune.Topic{
-				{ID: "topic1"},
-				{ID: "topic2"},
-				{ID: "topic3"},
-				{ID: "topic4"},
-				{ID: "topic5"},
-			}, nil
-		},
-	}
-
-	server := NewServer(repo)
-
-	res := httptest.NewRecorder()
-	req, err := http.NewRequest(http.MethodGet, "/topic", nil)
-	assert.NoError(t, err)
-
-	server.GetRouter().ServeHTTP(res, req)
-
-	var topics []*kitsune.Topic
-	err = json.NewDecoder(res.Body).Decode(&topics)
-	assert.NoError(t, err)
-	assert.Len(t, topics, 5)
-}
-
-func TestServer_GetTopics_Empty(t *testing.T) {
-	repo := &RepositoryMock{
-		getTopicsHandler: func() ([]*kitsune.Topic, error) {
-			return []*kitsune.Topic{}, nil
-		},
-	}
-
-	server := NewServer(repo)
-
-	res := httptest.NewRecorder()
-	req, err := http.NewRequest(http.MethodGet, "/topic", nil)
-	assert.NoError(t, err)
-
-	server.GetRouter().ServeHTTP(res, req)
-
-	var topics []*kitsune.Topic
-	err = json.NewDecoder(res.Body).Decode(&topics)
-	assert.NoError(t, err)
-	assert.Len(t, topics, 0)
-}
-
-func TestServer_GetTopic(t *testing.T) {
-	repo := &RepositoryMock{
-		getTopicHandler: func(topic string) (*kitsune.Topic, error) {
-			assert.Equal(t, "topic1", topic)
-			return &kitsune.Topic{ID: "topic1"}, nil
-		},
-	}
-
-	server := NewServer(repo)
-
-	res := httptest.NewRecorder()
-	req, err := http.NewRequest(http.MethodGet, "/topic/topic1", nil)
-	assert.NoError(t, err)
-
-	server.GetRouter().ServeHTTP(res, req)
-
-	var topic *kitsune.Topic
-	err = json.NewDecoder(res.Body).Decode(&topic)
-	assert.NoError(t, err)
-	assert.Equal(t, topic.ID, "topic1")
-}
-
-func TestServer_GetTopic_TopicNotFound(t *testing.T) {
-	repo := &RepositoryMock{
-		getTopicHandler: func(topic string) (*kitsune.Topic, error) {
-			return nil, repository.ErrTopicNotFound
-		},
-	}
-
-	server := NewServer(repo)
-
-	res := httptest.NewRecorder()
-	req, err := http.NewRequest(http.MethodGet, "/topic/topic1", nil)
-	assert.NoError(t, err)
-
-	server.GetRouter().ServeHTTP(res, req)
-
-	resPayload, err := ioutil.ReadAll(res.Body)
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusNotFound, res.Code)
-	assert.Equal(t, "Topic not found\n", string(resPayload))
-}
-
 func TestServer_Publish(t *testing.T) {
 	now = func() time.Time {
 		n, err := time.Parse(time.RFC3339, "2020-06-21T14:52:11.123456Z")
@@ -151,10 +60,12 @@ func TestServer_Publish(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	server := NewServer(repo)
+	server := &Server{
+		MessageRepo: repo,
+	}
 
 	res := httptest.NewRecorder()
-	req, err := http.NewRequest(http.MethodPost, "/topic/topic1", bytes.NewBuffer(paylaod))
+	req, err := http.NewRequest(http.MethodPost, "/message", bytes.NewBuffer(paylaod))
 	assert.NoError(t, err)
 
 	server.GetRouter().ServeHTTP(res, req)
@@ -165,49 +76,23 @@ func TestServer_Publish(t *testing.T) {
 
 	assert.Equal(t, message.ID, "someId")
 	assert.Equal(t, message.PublishedTime, timeFromStr("2020-06-21T14:52:11.123456Z"))
-	assert.Equal(t, message.Topic, "topic1")
 	assert.Equal(t, message.Payload, "Some payload")
-}
-
-func TestServer_Publish_Duplicate(t *testing.T) {
-	repo := &RepositoryMock{
-		addMessageHandler: func(message *kitsune.Message) error {
-			return repository.ErrDuplicate
-		},
-	}
-
-	payload, err := json.Marshal(&PublishRequest{
-		Payload: "Some payload",
-	})
-	assert.NoError(t, err)
-
-	server := NewServer(repo)
-
-	res := httptest.NewRecorder()
-	req, err := http.NewRequest(http.MethodPost, "/topic/topic1", bytes.NewBuffer(payload))
-	assert.NoError(t, err)
-
-	server.GetRouter().ServeHTTP(res, req)
-
-	resPayload, err := ioutil.ReadAll(res.Body)
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusConflict, res.Code)
-	assert.Equal(t, "Duplicate message id\n", string(resPayload))
 }
 
 func TestServer_GetMessage(t *testing.T) {
 	repo := &RepositoryMock{
-		getMessageHandler: func(topic, id string) (message *kitsune.Message, err error) {
-			assert.Equal(t, "topic1", topic)
+		getMessageHandler: func(id string) (message *kitsune.Message, err error) {
 			assert.Equal(t, "message1", id)
 			return &kitsune.Message{}, nil
 		},
 	}
 
-	server := NewServer(repo)
+	server := &Server{
+		MessageRepo: repo,
+	}
 
 	res := httptest.NewRecorder()
-	req, err := http.NewRequest(http.MethodGet, "/topic/topic1/message1", nil)
+	req, err := http.NewRequest(http.MethodGet, "/message/message1", nil)
 	assert.NoError(t, err)
 
 	server.GetRouter().ServeHTTP(res, req)
@@ -217,38 +102,19 @@ func TestServer_GetMessage(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestServer_GetMessage_TopicNotFound(t *testing.T) {
-	repo := &RepositoryMock{
-		getMessageHandler: func(topic, id string) (message *kitsune.Message, err error) {
-			return nil, repository.ErrTopicNotFound
-		},
-	}
-
-	server := NewServer(repo)
-
-	res := httptest.NewRecorder()
-	req, err := http.NewRequest(http.MethodGet, "/topic/topic1/message1", nil)
-	assert.NoError(t, err)
-
-	server.GetRouter().ServeHTTP(res, req)
-
-	resPayload, err := ioutil.ReadAll(res.Body)
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusNotFound, res.Code)
-	assert.Equal(t, "Topic not found\n", string(resPayload))
-}
-
 func TestServer_GetMessage_MessageNotFound(t *testing.T) {
 	repo := &RepositoryMock{
-		getMessageHandler: func(topic, id string) (message *kitsune.Message, err error) {
+		getMessageHandler: func(id string) (message *kitsune.Message, err error) {
 			return nil, repository.ErrMessageNotFound
 		},
 	}
 
-	server := NewServer(repo)
+	server := &Server{
+		MessageRepo: repo,
+	}
 
 	res := httptest.NewRecorder()
-	req, err := http.NewRequest(http.MethodGet, "/topic/topic1/message1", nil)
+	req, err := http.NewRequest(http.MethodGet, "/message/message1", nil)
 	assert.NoError(t, err)
 
 	server.GetRouter().ServeHTTP(res, req)
@@ -257,6 +123,105 @@ func TestServer_GetMessage_MessageNotFound(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusNotFound, res.Code)
 	assert.Equal(t, "Message not found\n", string(resPayload))
+}
+
+func TestServer_GetTopics(t *testing.T) {
+	repo := &RepositoryMock{
+		getTopicsHandler: func() ([]*kitsune.Topic, error) {
+			return []*kitsune.Topic{
+				{ID: "topic1"},
+				{ID: "topic2"},
+				{ID: "topic3"},
+				{ID: "topic4"},
+				{ID: "topic5"},
+			}, nil
+		},
+	}
+
+	server := &Server{
+		TopicRepo: repo,
+	}
+
+	res := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodGet, "/topic", nil)
+	assert.NoError(t, err)
+
+	server.GetRouter().ServeHTTP(res, req)
+
+	var topics []*kitsune.Topic
+	err = json.NewDecoder(res.Body).Decode(&topics)
+	assert.NoError(t, err)
+	assert.Len(t, topics, 5)
+}
+
+func TestServer_GetTopics_Empty(t *testing.T) {
+	repo := &RepositoryMock{
+		getTopicsHandler: func() ([]*kitsune.Topic, error) {
+			return []*kitsune.Topic{}, nil
+		},
+	}
+
+	server := &Server{
+		TopicRepo: repo,
+	}
+
+	res := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodGet, "/topic", nil)
+	assert.NoError(t, err)
+
+	server.GetRouter().ServeHTTP(res, req)
+
+	var topics []*kitsune.Topic
+	err = json.NewDecoder(res.Body).Decode(&topics)
+	assert.NoError(t, err)
+	assert.Len(t, topics, 0)
+}
+
+func TestServer_GetTopic(t *testing.T) {
+	repo := &RepositoryMock{
+		getTopicHandler: func(topic string) (*kitsune.Topic, error) {
+			assert.Equal(t, "topic1", topic)
+			return &kitsune.Topic{ID: "topic1"}, nil
+		},
+	}
+
+	server := &Server{
+		TopicRepo: repo,
+	}
+
+	res := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodGet, "/topic/topic1", nil)
+	assert.NoError(t, err)
+
+	server.GetRouter().ServeHTTP(res, req)
+
+	var topic *kitsune.Topic
+	err = json.NewDecoder(res.Body).Decode(&topic)
+	assert.NoError(t, err)
+	assert.Equal(t, topic.ID, "topic1")
+}
+
+func TestServer_GetTopic_TopicNotFound(t *testing.T) {
+	repo := &RepositoryMock{
+		getTopicHandler: func(topic string) (*kitsune.Topic, error) {
+			return nil, repository.ErrTopicNotFound
+		},
+	}
+
+	server := &Server{
+		TopicRepo: repo,
+	}
+
+	res := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodGet, "/topic/topic1", nil)
+	assert.NoError(t, err)
+
+	server.GetRouter().ServeHTTP(res, req)
+
+	resPayload, err := ioutil.ReadAll(res.Body)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, res.Code)
+	assert.Equal(t, "Topic not found\n", string(resPayload))
 }
 
 func timeFromStr(s string) time.Time {

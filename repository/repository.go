@@ -15,19 +15,17 @@ var (
 	ErrTopicNotFound = errors.New("topic not found")
 )
 
-// Repository defines the behaviour to be satified by a repository.
-type Repository interface {
-	TopicRepository
-	SubscriptionRepository
+// MessageRepository defines the behaviour to be satified by a message repository.
+type MessageRepository interface {
+	AddMessage(message *kitsune.Message) error
+	GetMessage(id string) (*kitsune.Message, error)
 }
 
-// TopicRepository defines the behaviour to be satified by a repository.
+// TopicRepository defines the behaviour to be satified by a topic repository.
 type TopicRepository interface {
 	GetTopics() ([]*kitsune.Topic, error)
-	GetTopic(topic string) (*kitsune.Topic, error)
-	AddMessage(message *kitsune.Message) error
-	GetMessage(topic, id string) (*kitsune.Message, error)
+	GetTopic(id string) (*kitsune.Topic, error)
 }
 
-// SubscriptionRepository defines the behaviour to be satified by a repository.
+// SubscriptionRepository defines the behaviour to be satified by a subscription repository.
 type SubscriptionRepository interface{}

@@ -27,7 +27,12 @@ func main() {
 
 	zap.S().Info("Staring application")
 
-	ks := server.NewServer(memory.NewRepository())
+	repo := memory.NewRepository()
+
+	ks := server.Server{
+		MessageRepo: repo,
+		TopicRepo:   repo,
+	}
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", viper.GetInt("port")),

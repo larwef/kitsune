@@ -10,6 +10,5 @@ type Message struct {
 	PublishedTime time.Time         `json:"publishedTime"`
 	Properties    map[string]string `json:"properties,omitempty"`
 	EventTime     *time.Time        `json:"eventTime,omitempty"`
-	Topic         string            `json:"topic"`
 	Payload       string            `json:"payload"`
 }

@@ -9,11 +9,13 @@ import (
 func (s *Server) GetRouter() http.Handler {
 	router := httprouter.New()
 
+	// Message
+	router.Handler(http.MethodPost, "/message", s.addMessage())
+	router.Handler(http.MethodGet, "/message/:messageId", s.getMessage())
+
 	// Topic
 	router.Handler(http.MethodGet, "/topic", s.getTopics())
 	router.Handler(http.MethodGet, "/topic/:topicId", s.getTopic())
-	router.Handler(http.MethodPost, "/topic/:topicId", s.addMessage())
-	router.Handler(http.MethodGet, "/topic/:topicId/:messageId", s.getMessage())
 
 	return router
 }
